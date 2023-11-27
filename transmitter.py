@@ -1,70 +1,50 @@
-from bchlib import BCH
 import random
 import os
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+from bchlib import BCH
 
 print("CWD:", os.getcwd())
 
 def serialize_data(message):
     return message.encode()
 
-'''
-def encode_bytes_with_bch(data, bch, chunk_size=8):
-    encoded_chunks = []
-
-    for i in range(0, len(data), chunk_size):
-        chunk = data[i:i+chunk_size]
-        # Pad the last chunk with zeros if needed
-        chunk += b'\x00' * (chunk_size - len(chunk))
-        # BCH Encoding
-        encoded_chunk = bch.encode(chunk)
-        # Append the encoded chunk to the result
-        encoded_chunks.append(encoded_chunk)
-
-    return encoded_chunks
-
-
-def decode_bytes_with_bch(encoded_chunks, bch):
-    decoded_chunks = []
-
-    for encoded_chunk in encoded_chunks:
-        # BCH Decoding
-        decoded_chunk = bch.decode(encoded_chunk)
-        # Append the decoded chunk to the result
-        decoded_chunks.append(decoded_chunk)
-
-    return decoded_chunks
-
-
-def add_noise(data, percentage):
-    num_bytes_to_flip = int(len(data) * percentage / 8)
+def add_noise(data, error_percentage):
+    num_bits_to_flip = int(len(bin(int.from_bytes(data, "big"))) * error_percentage)
     noisy_data = bytearray(data)
     
-    for _ in range(num_bytes_to_flip):
-        byte_index = random.randint(0, len(data) - 1)
-        bit_index = random.randint(0, 7)
-        noisy_data[byte_index] ^= (1 << bit_index)
+    for _ in range(num_bits_to_flip):
+        bit_index = random.randint(0, len(data) - 1)
+        noisy_data[bit_index] ^= 1  # Flip the bit
     
     return bytes(noisy_data)
 
-def bpsk_modulation(data, carrier_frequency):
 
-    # Sample Rate: 100MHz
+def bpsk_modulation(data, carrier_frequency, points_per_bit=100):
+
     # Time Duration: Sample Rate * data length
-    time_duration = len(data) / 100e6
-    time_points = np.linspace(0, time_duration, int(100e6 * time_duration), endpoint=False)
+    time_duration = (len(bin(int.from_bytes(noisy_data, "big"))) - 2) / carrier_frequency
+    time_points = np.linspace(0, time_duration, points_per_bit * (len(bin(int.from_bytes(noisy_data, "big"))) - 2), endpoint=False)
     
-    # Convert bytes to integers (0 or 1)
-    numeric_data = np.frombuffer(data, dtype=np.uint8) - ord('0')
+    # Convert binary data to a list of integers (0 or 1)
+    bits = [int(bit) for byte in data for bit in f"{byte:08b}"]
+    time_per_bit = time_duration / len(bits)
 
     # Modulate the data onto the carrier signal
     # Amplitude of 1
-    modulated_signal = np.sin(2 * np.pi * carrier_frequency * time_points + np.pi * (2 * numeric_data - 1))
+    modulated_signal = np.zeros_like(time_points, dtype=float)
+    for i, bit in enumerate(bits):
+        modulated_signal[i * points_per_bit: (i + 1) * points_per_bit] = \
+            np.sin(2 * np.pi * carrier_frequency * time_points[i * points_per_bit: (i + 1) * points_per_bit] +
+                   np.pi * (2 * bit - 1))
+        
+    square_wave = np.repeat(bits, 2)
+    square_time = np.repeat(np.arange(0, time_duration, time_per_bit), 2)
+        
+    return modulated_signal, time_points, square_wave, square_time
 
-    return modulated_signal, time_points
-'''
+
 # Read message from file
 with open('message.txt', 'r') as file:
     message = file.read()
@@ -74,45 +54,36 @@ serialized_data = serialize_data(message)
 binary_int = int.from_bytes(serialized_data, "big")
 binary_string = bin(binary_int)
 print("Data Serialized")
-print("Length of Serialized Data:", len(serialized_data))
-print(serialized_data)
-print(binary_string)
-chunks = [serialized_data[i:i+8] for i in range(0, len(serialized_data), 8)]
+print("Length of Serialized Data:", len(binary_string))
+print("Serialized Data:", serialized_data)
+print("Binary String:", binary_string)
 
-num_errors = math.ceil(len(serialized_data) * 0.1)
-m = len(serialized_data)
-t = m - math.log2(len(serialized_data) + num_errors + 1)
-t = max(1, int(t))
+# Error Correction Parameters
+length = len(binary_string)
+num_errors = math.ceil(length * 0.1)
+m = math.ceil(math.log2(length + 1))
+print("Code Order: ", m)
+print("Error Correction: ", num_errors)
 
 # BCH Encoding
-bch = BCH(t=int(t), m=int(m))
+bch = BCH(t=int(num_errors), m=int(m))
 bch_encoded_data = bch.encode(serialized_data)
-print("Length of Serialized Data:", len(bch_encoded_data))
-'''
-# Encode each 8-bit chunk using BCH
-encoded_chunks = encode_bytes_with_bch(serialized_data, bch)
+print("Length of Serialized Data:", len(bin(int.from_bytes(serialized_data, "big"))))
+print("Length of Encoded Data:", len(bin(int.from_bytes(bch_encoded_data, "big"))))
+print("Serialized Data:", binary_string)
+print("Encoded Data:", bin(int.from_bytes(bch_encoded_data, "big")))
 
-# Print or use the encoded chunks as needed
-
-for encoded_chunk in encoded_chunks:
-    print(encoded_chunk)
-print("Data Encoded")
-
-# Decode each set of bytes using BCH
-decoded_chunks = decode_bytes_with_bch(encoded_chunks, bch)
-
-# Print or use the decoded chunks as needed
-for decoded_chunk in decoded_chunks:
-    print(decoded_chunk)
 
 # Add Noise
-noisy_data = add_noise(encoded_data, 0.1)  # 10% noise as an example
+noisy_data = add_noise(bch_encoded_data, 0.1)  # 10% noise as an example
 print("Noise Introduced")
+print("Length of Noisy Encoded Data:", len(bin(int.from_bytes(noisy_data, "big"))))
+print("Noisy Encoded Data:", bin(int.from_bytes(noisy_data, "big")))
 
 # BPSK Modulation
-modulated_data, time_data = bpsk_modulation(noisy_data, 6e9)  # 6 GHz carrier frequency
+modulated_data, time_data, square_wave, square_time = bpsk_modulation(noisy_data, 6e2, points_per_bit=100)  # 6 GHz carrier frequency
 print("Data modulated")
-'''
+
 # Write to file
 try:
     with open('transmitter.txt', 'wb') as file:
@@ -125,11 +96,11 @@ with open('transmitter.txt', 'rb') as file:
     file_content = file.read()
     print("File Content:", file_content)
 
-'''
+
 # Plot the modulated signal
 plt.plot(time_data, modulated_data)
+plt.step(square_time, square_wave)
 plt.xlabel('Time (s)')
 plt.ylabel('Amplitude')
 plt.title('BPSK Modulated Signal')
 plt.show()
-'''
