@@ -23,26 +23,27 @@ def add_noise(data, error_percentage):
 
 def bpsk_modulation(data, carrier_frequency, points_per_bit=100):
 
-    # Time Duration: Sample Rate * data length
-    time_duration = (len(bin(int.from_bytes(noisy_data, "big"))) - 2) / carrier_frequency
-    time_points = np.linspace(0, time_duration, points_per_bit * (len(bin(int.from_bytes(noisy_data, "big"))) - 2), endpoint=False)
-    
     # Convert binary data to a list of integers (0 or 1)
     bits = [int(bit) for byte in data for bit in f"{byte:08b}"]
+    time_duration = len(bits) / carrier_frequency
     time_per_bit = time_duration / len(bits)
+    time_points = np.linspace(0, time_duration, points_per_bit * len(bits), endpoint=False)
 
     # Modulate the data onto the carrier signal
     # Amplitude of 1
     modulated_signal = np.zeros_like(time_points, dtype=float)
     for i, bit in enumerate(bits):
+        phase_shift = 0 if bit == 0 else np.pi
         modulated_signal[i * points_per_bit: (i + 1) * points_per_bit] = \
-            np.sin(2 * np.pi * carrier_frequency * time_points[i * points_per_bit: (i + 1) * points_per_bit] +
-                   np.pi * (2 * bit - 1))
+            np.sin(2 * np.pi * carrier_frequency * time_points[i * points_per_bit: (i + 1) * points_per_bit] + phase_shift)
         
-    square_wave = np.repeat(bits, 2)
-    square_time = np.repeat(np.arange(0, time_duration, time_per_bit), 2)
-        
-    return modulated_signal, time_points, square_wave, square_time
+    # square_wave = np.repeat(bits, 2)
+    # square_time = np.repeat(np.arange(0, time_duration, time_per_bit), 2)
+
+    stretched_square_wave = np.repeat(bits, points_per_bit)
+    stretched_square_time = np.linspace(0, time_duration, len(stretched_square_wave), endpoint=False)
+
+    return modulated_signal, time_points, stretched_square_wave, stretched_square_time
 
 
 # Read message from file
@@ -81,24 +82,33 @@ print("Length of Noisy Encoded Data:", len(bin(int.from_bytes(noisy_data, "big")
 print("Noisy Encoded Data:", bin(int.from_bytes(noisy_data, "big")))
 
 # BPSK Modulation
-modulated_data, time_data, square_wave, square_time = bpsk_modulation(noisy_data, 6e2, points_per_bit=100)  # 6 GHz carrier frequency
+modulated_data, time_data, square_wave, square_time = bpsk_modulation(noisy_data, 6e9, points_per_bit=100)  # 6 GHz carrier frequency
 print("Data modulated")
+
+# Write to file
+transmission_data = np.column_stack((time_data, modulated_data))
 
 # Write to file
 try:
     with open('transmitter.txt', 'wb') as file:
-        file.write(serialized_data)
-        file.flush()
+        np.savetxt(file, transmission_data)
 except Exception as e:
     print("Error:", e)
 
+# Read and print the file content
 with open('transmitter.txt', 'rb') as file:
-    file_content = file.read()
-    print("File Content:", file_content)
+    file_content = np.loadtxt(file)
 
+'''
+print("Length of square_time:", len(square_time))
+print("First few values of square_time:", square_time[:10])
+
+print("Length of time_points:", len(time_data))
+print("First few values of time_points:", time_data[:10])
+'''
 
 # Plot the modulated signal
-plt.plot(time_data, modulated_data)
+plt.plot(file_content[:, 0], file_content[:, 1])
 plt.step(square_time, square_wave)
 plt.xlabel('Time (s)')
 plt.ylabel('Amplitude')
