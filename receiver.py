@@ -68,6 +68,8 @@ print("Demod Data: ", bin(int.from_bytes(byte_data, "big")))
 num_errors = math.ceil(len(bin(int.from_bytes(byte_data, "big"))) * 0.1)
 m = math.ceil(math.log2(len(bin(int.from_bytes(byte_data, "big"))) + 1))
 bch = BCH(t=int(num_errors), m=int(m))
+print("Num Errors:", num_errors)
+print("Code Order (m):", m)
 decoded_data = bch.decode(demodulated_data)
 print("Decoded Data: ", bin(int.from_bytes(decoded_data, "big")))
 
