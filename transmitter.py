@@ -3,14 +3,15 @@ import os
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-from bchlib import BCH
+#from bchlib import BCH
 
 print("CWD:", os.getcwd())
 
 def serialize_data(message):
     return message.encode()
 
-def add_noise(data, error_percentage):
+'''
+def add_error(data, error_percentage):
     num_bits_to_flip = int(len(bin(int.from_bytes(data, "big"))) * error_percentage)
     noisy_data = bytearray(data)
     
@@ -19,8 +20,20 @@ def add_noise(data, error_percentage):
         noisy_data[bit_index] ^= 1  # Flip the bit
     
     return bytes(noisy_data)
+'''
 
+# A select set of frequencies are introduced with random amplitudes between -0.1 and 0.1
+def add_noise(data, time, amplitude_range=(-0.1, 0.1)):
+    noisy_data = data.copy()
+    frequencies = [60, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 5e8, 5e10]
+    for freq in frequencies:
+        amplitude = random.uniform(*amplitude_range)
+        print("Frequency: ", freq, "Noise Added: ", amplitude)
+        noise = amplitude * np.sin(2 * np.pi * freq * time)
+        noisy_data += noise
+    return noisy_data
 
+# The data is BPSK modulated and each bit is plotted as a datapoint 100 times
 def bpsk_modulation(data, carrier_frequency, points_per_bit=100):
 
     # Convert binary data to a list of integers (0 or 1)
@@ -59,6 +72,7 @@ print("Length of Serialized Data:", len(binary_string))
 print("Serialized Data:", serialized_data)
 print("Binary String:", binary_string)
 
+'''
 # Error Correction Parameters
 length = len(binary_string)
 num_errors = math.ceil(length * 0.1)
@@ -77,18 +91,24 @@ print("Parity Bits:", bin(int.from_bytes(parity_bits, "big")))
 bch_encoded_data =  serialized_data + parity_bits
 
 
-# Add Noise
-noisy_data = add_noise(bch_encoded_data, 0.1)  # 10% noise as an example
+# Flip Bits
+noisy_data = add_error(bch_encoded_data, 0.1)  # 10% noise as an example
 print("Noise Introduced")
 print("Length of Noisy Encoded Data:", len(bin(int.from_bytes(noisy_data, "big"))))
 print("Noisy Encoded Data:", bin(int.from_bytes(noisy_data, "big")))
+'''
 
-# BPSK Modulation
-modulated_data, time_data, square_wave, square_time = bpsk_modulation(noisy_data, 6e9, points_per_bit=100)  # 6 GHz carrier frequency
+
+# BPSK Modulation @ 6GHz (C-Band)
+modulated_data, time_data, square_wave, square_time = bpsk_modulation(serialized_data, 6e9, points_per_bit=100)  # 6 GHz carrier frequency
 print("Data modulated")
 
+# Adds Noise
+noisy_data = add_noise(modulated_data, time_data)
+
+
 # Write to file
-transmission_data = np.column_stack((time_data, modulated_data))
+transmission_data = np.column_stack((time_data, noisy_data))
 
 # Write to file
 try:
@@ -97,12 +117,14 @@ try:
 except Exception as e:
     print("Error:", e)
 
+'''
 # Write to parity num
 try:
     with open('parity_num.txt', 'w') as file:
         file.write(str(len(bin(int.from_bytes(parity_bits, "big")))))
 except Exception as e:
     print("Error:", e)
+'''
 
 # Read and print the file content
 with open('transmitter.txt', 'rb') as file:
@@ -116,8 +138,9 @@ print("Length of time_points:", len(time_data))
 print("First few values of time_points:", time_data[:10])
 '''
 
-# Plot the modulated signal
+# Plots the modulated signal
 plt.plot(file_content[:, 0], file_content[:, 1])
+plt.plot(file_content[:, 0], modulated_data)
 plt.step(square_time, square_wave)
 plt.xlabel('Time (s)')
 plt.ylabel('Amplitude')

@@ -1,8 +1,9 @@
 import numpy as np
 import math
 import struct
-from bchlib import BCH
+#from bchlib import BCH
 
+# Demodulates the data at the given carrier frequency by comparing phase shift sine waves with data set
 def bpsk_demodulation(modulated_data, carrier_frequency, time_points):
 
     threshold = 0.0
@@ -23,29 +24,31 @@ def bpsk_demodulation(modulated_data, carrier_frequency, time_points):
 
     for i in range(info_length):
         # Calculate the index for each bit
-        index = int((i + 0.33) * len(time_points) / info_length)
+        index1 = int((i + 0.33) * len(time_points) / info_length)
+        index2 = int((i + 0.66) * len(time_points) / info_length)
 
         # print("Index: ", index, "Time: ", time_points[index], "Value: ", modulated_data[index])
 
         # Calculate distances from both carriers
-        distance_base = np.abs(modulated_data[index] - base_carrier[index])
-        distance_shifted = np.abs(modulated_data[index] - shifted_carrier[index])
+        distance_base1 = np.abs(modulated_data[index1] - base_carrier[index1])
+        distance_shifted1 = np.abs(modulated_data[index1] - shifted_carrier[index1])
+        distance_base2 = np.abs(modulated_data[index2] - base_carrier[index2])
+        distance_shifted2 = np.abs(modulated_data[index2] - shifted_carrier[index2])
         # print("Base: ", distance_base, "Shifted: ", distance_shifted)
 
         # Determine the demodulated bit based on minimum distance
-        if distance_base < distance_shifted:
+        if (distance_base1 < distance_shifted1 and distance_base2 < distance_shifted2):
             demodulated_data[i] = 0
-        else:
+        elif(distance_base1 > distance_shifted1 and distance_base2 > distance_shifted2):
             demodulated_data[i] = 1
+        else:
+            demodulated_data[i] = 0    
+            print("Error in Demodulation Index1: ", index1, ", Index2: ", index2)
 
     # print("Demodulated Data Length: ", len(demodulated_data))
     # print("Demodulated Data:", demodulated_data)
 
     return demodulated_data
-
-def deserialize_data(binary_data):
-    # Implementation required
-    pass
 
 # Read from file
 with open('transmitter.txt', 'rb') as file:
@@ -55,7 +58,6 @@ time_points = transmission_data[:, 0]
 modulated_signal = transmission_data[:, 1]
 
 # BPSK Demodulation
-threshold_value = 0.0  # Adjust the threshold as needed
 demodulated_data = bpsk_demodulation(modulated_signal, 6e9, time_points)
 # print("Demod Data Length: ", len(demodulated_data))
 # print("Data: ", demodulated_data[0:])
@@ -64,6 +66,7 @@ byte_data = integer_value.to_bytes((len(demodulated_data) + 7) // 8, byteorder='
 print("Data Length: ", len(bin(int.from_bytes(byte_data, "big"))))
 print("Demod Data: ", bin(int.from_bytes(byte_data, "big")))
 
+'''
 # BCH Decoding
 with open('parity_num.txt', 'r') as file:
     parity_num_str = file.read().strip()
@@ -90,9 +93,11 @@ print("Length", len(bin(int.from_bytes(received_bytes, "big"))))
 bch = BCH(t=int(t), m=int(m))
 decoded_data = bch.decode(received_bytes, parity_bytes)
 print("Decoded Data: ", bin(int.from_bytes(decoded_data, "big")))
+'''
 
 # Deserialize data
-# final_message = deserialize_data(decoded_data)
+final_message = byte_data.decode("utf-8")
+print("Final Message:", final_message)
 
 # Print the final message
 # Read message from file
