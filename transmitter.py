@@ -62,17 +62,19 @@ print("Binary String:", binary_string)
 # Error Correction Parameters
 length = len(binary_string)
 num_errors = math.ceil(length * 0.1)
-m = math.ceil(math.log2(length + 1))
+m = math.ceil(math.log2(length + num_errors + 1))
 print("Code Order: ", m)
 print("Error Correction: ", num_errors)
+print("Length: ", length)
 
 # BCH Encoding
 bch = BCH(t=int(num_errors), m=int(m))
-bch_encoded_data = bch.encode(serialized_data)
+parity_bits = bch.encode(serialized_data)
 print("Length of Serialized Data:", len(bin(int.from_bytes(serialized_data, "big"))))
-print("Length of Encoded Data:", len(bin(int.from_bytes(bch_encoded_data, "big"))))
+print("Length of Parity Bits:", len(bin(int.from_bytes(parity_bits, "big"))))
 print("Serialized Data:", binary_string)
-print("Encoded Data:", bin(int.from_bytes(bch_encoded_data, "big")))
+print("Parity Bits:", bin(int.from_bytes(parity_bits, "big")))
+bch_encoded_data =  serialized_data + parity_bits
 
 
 # Add Noise
@@ -92,6 +94,13 @@ transmission_data = np.column_stack((time_data, modulated_data))
 try:
     with open('transmitter.txt', 'wb') as file:
         np.savetxt(file, transmission_data)
+except Exception as e:
+    print("Error:", e)
+
+# Write to parity num
+try:
+    with open('parity_num.txt', 'w') as file:
+        file.write(str(len(bin(int.from_bytes(parity_bits, "big")))))
 except Exception as e:
     print("Error:", e)
 

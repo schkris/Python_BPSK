@@ -65,12 +65,30 @@ print("Data Length: ", len(bin(int.from_bytes(byte_data, "big"))))
 print("Demod Data: ", bin(int.from_bytes(byte_data, "big")))
 
 # BCH Decoding
-num_errors = math.ceil(len(bin(int.from_bytes(byte_data, "big"))) * 0.1)
-m = math.ceil(math.log2(len(bin(int.from_bytes(byte_data, "big"))) + 1))
-bch = BCH(t=int(num_errors), m=int(m))
-print("Num Errors:", num_errors)
+with open('parity_num.txt', 'r') as file:
+    parity_num_str = file.read().strip()
+    parity_num = int(parity_num_str)
+print("Parity Num:", parity_num)
+byte_string = ''.join(map(str, demodulated_data))
+received_data = byte_string[:parity_num]
+parity = byte_string[parity_num:]
+parity_int = int(parity, 2)
+print("Parity Int: ", parity_int)
+received_int = int(received_data, 2)
+print("Received Int: ", received_int)
+parity_bytes = parity_int.to_bytes((len(parity) + 7) // 8, byteorder='big')
+received_bytes = received_int.to_bytes((len(received_data) + 7) // 8, byteorder='big')
+print("Parity Length: ", len(bin(int.from_bytes(parity_bytes, "big"))))
+print("Received Length: ", len(bin(int.from_bytes(received_bytes, "big"))))
+print("Parity Bits: ", bin(int.from_bytes(parity_bytes, "big")))
+print("Received Data: ", bin(int.from_bytes(received_bytes, "big")))
+t = math.ceil(len(bin(int.from_bytes(received_bytes, "big"))) * 0.1)
+m = math.ceil(math.log2(len(bin(int.from_bytes(received_bytes, "big"))) + t + 1))
+print("Num Errors:", t)
 print("Code Order (m):", m)
-decoded_data = bch.decode(demodulated_data)
+print("Length", len(bin(int.from_bytes(received_bytes, "big"))))
+bch = BCH(t=int(t), m=int(m))
+decoded_data = bch.decode(received_bytes, parity_bytes)
 print("Decoded Data: ", bin(int.from_bytes(decoded_data, "big")))
 
 # Deserialize data
